@@ -77,21 +77,47 @@ with tab1:
     fig_trend = px.line(revenue_trend, x='Date', y='Revenue_After_Discount', title="Revenue Trend Over Time")
     st.plotly_chart(fig_trend, use_container_width=True)
 
-    col5, col6 = st.columns(2)
+       col5, col6 = st.columns(2)
     with col5:
         revenue_by_category = filtered_df.groupby('Category')['Revenue_After_Discount'].sum().reset_index().sort_values('Revenue_After_Discount', ascending=False)
-        fig_cat = px.bar(revenue_by_category, x='Category', y='Revenue_After_Discount', title="Revenue by Category")
+        fig_cat = px.bar(revenue_by_category, x='Category', y='Revenue_After_Discount', title="Revenue by Category", text_auto='.2s')
+        fig_cat.update_yaxes(range=[revenue_by_category['Revenue_After_Discount'].min() * 0.9, revenue_by_category['Revenue_After_Discount'].max() * 1.05])
         st.plotly_chart(fig_cat, use_container_width=True)
+        top_cat = revenue_by_category.iloc[0]
+        bottom_cat = revenue_by_category.iloc[-1]
+        gap_pct = ((top_cat['Revenue_After_Discount'] - bottom_cat['Revenue_After_Discount']) / bottom_cat['Revenue_After_Discount']) * 100
+        st.caption(f"**{top_cat['Category']}** leads with **{gap_pct:.1f}%** more revenue than the lowest category, **{bottom_cat['Category']}**.")
+
     with col6:
         revenue_by_region = filtered_df.groupby('Region')['Revenue_After_Discount'].sum().reset_index().sort_values('Revenue_After_Discount', ascending=False)
-        fig_region = px.bar(revenue_by_region, x='Region', y='Revenue_After_Discount', title="Revenue by Region")
+        fig_region = px.bar(revenue_by_region, x='Region', y='Revenue_After_Discount', title="Revenue by Region", text_auto='.2s')
+        fig_region.update_yaxes(range=[revenue_by_region['Revenue_After_Discount'].min() * 0.9, revenue_by_region['Revenue_After_Discount'].max() * 1.05])
         st.plotly_chart(fig_region, use_container_width=True)
+        top_reg = revenue_by_region.iloc[0]
+        bottom_reg = revenue_by_region.iloc[-1]
+        gap_pct_reg = ((top_reg['Revenue_After_Discount'] - bottom_reg['Revenue_After_Discount']) / bottom_reg['Revenue_After_Discount']) * 100
+        st.caption(f"**{top_reg['Region']}** leads with **{gap_pct_reg:.1f}%** more revenue than the lowest region, **{bottom_reg['Region']}**.")
 
     st.subheader("🎉 Promotion Impact on Revenue")
-    promo_impact = filtered_df.groupby('Holiday/Promotion')['Revenue_After_Discount'].mean().reset_index()
-    promo_impact['Holiday/Promotion'] = promo_impact['Holiday/Promotion'].map({0: 'No Promotion', 1: 'Promotion'})
-    fig_promo = px.bar(promo_impact, x='Holiday/Promotion', y='Revenue_After_Discount', title="Avg Revenue: Promotion vs No Promotion")
-    st.plotly_chart(fig_promo, use_container_width=True)
+promo_impact = filtered_df.groupby('Holiday/Promotion')['Revenue_After_Discount'].mean().reset_index()
+promo_impact['Holiday/Promotion'] = promo_impact['Holiday/Promotion'].map({0: 'No Promotion', 1: 'Promotion'})
+
+no_promo_val = promo_impact.loc[promo_impact['Holiday/Promotion'] == 'No Promotion', 'Revenue_After_Discount'].values[0]
+promo_val = promo_impact.loc[promo_impact['Holiday/Promotion'] == 'Promotion', 'Revenue_After_Discount'].values[0]
+pct_diff = ((promo_val - no_promo_val) / no_promo_val) * 100
+
+fig_promo = px.bar(
+    promo_impact, x='Holiday/Promotion', y='Revenue_After_Discount',
+    title="Avg Revenue: Promotion vs No Promotion",
+    text_auto='.2s'
+)
+fig_promo.update_yaxes(range=[min(no_promo_val, promo_val) * 0.9, max(no_promo_val, promo_val) * 1.1])
+st.plotly_chart(fig_promo, use_container_width=True)
+
+st.caption(
+    f"Promotions show a **{pct_diff:+.1f}%** difference in average revenue per transaction — "
+    f"a negligible effect in this dataset, suggesting promotions here don't meaningfully drive higher order value."
+)
 
 # =========================
 # TAB 2: INVENTORY HEALTH
