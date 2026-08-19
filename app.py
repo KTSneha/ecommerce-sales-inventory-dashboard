@@ -73,9 +73,18 @@ with tab1:
 
     st.divider()
 
-    revenue_trend = filtered_df.groupby('Date')['Revenue_After_Discount'].sum().reset_index()
-    fig_trend = px.line(revenue_trend, x='Date', y='Revenue_After_Discount', title="Revenue Trend Over Time")
-    st.plotly_chart(fig_trend, use_container_width=True)
+   revenue_trend = filtered_df.groupby('Date')['Revenue_After_Discount'].sum().reset_index()
+revenue_trend = revenue_trend.sort_values('Date')
+revenue_trend['7-Day Avg'] = revenue_trend['Revenue_After_Discount'].rolling(window=7, min_periods=1).mean()
+
+fig_trend = px.line(
+    revenue_trend, x='Date', y=['Revenue_After_Discount', '7-Day Avg'],
+    title="Revenue Trend Over Time (Daily vs 7-Day Rolling Average)",
+    labels={'value': 'Revenue', 'variable': ''}
+)
+fig_trend.update_traces(opacity=0.3, selector=dict(name='Revenue_After_Discount'))
+fig_trend.update_traces(line=dict(width=3), selector=dict(name='7-Day Avg'))
+st.plotly_chart(fig_trend, use_container_width=True)
 
     col5, col6 = st.columns(2)
     with col5:
