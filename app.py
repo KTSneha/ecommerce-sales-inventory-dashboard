@@ -77,7 +77,7 @@ with tab1:
     fig_trend = px.line(revenue_trend, x='Date', y='Revenue_After_Discount', title="Revenue Trend Over Time")
     st.plotly_chart(fig_trend, use_container_width=True)
 
-       col5, col6 = st.columns(2)
+    col5, col6 = st.columns(2)
     with col5:
         revenue_by_category = filtered_df.groupby('Category')['Revenue_After_Discount'].sum().reset_index().sort_values('Revenue_After_Discount', ascending=False)
         fig_cat = px.bar(revenue_by_category, x='Category', y='Revenue_After_Discount', title="Revenue by Category", text_auto='.2s')
@@ -96,7 +96,7 @@ with tab1:
         top_reg = revenue_by_region.iloc[0]
         bottom_reg = revenue_by_region.iloc[-1]
         gap_pct_reg = ((top_reg['Revenue_After_Discount'] - bottom_reg['Revenue_After_Discount']) / bottom_reg['Revenue_After_Discount']) * 100
-        st.caption(f"**{top_reg['Region']}** leads with **{gap_pct_reg:.1f}%** more revenue than the lowest region, **{bottom_reg['Region']}**.")
+    st.caption(f"**{top_reg['Region']}** leads with **{gap_pct_reg:.1f}%** more revenue than the lowest region, **{bottom_reg['Region']}**.")
 
     st.subheader("🎉 Promotion Impact on Revenue")
 promo_impact = filtered_df.groupby('Holiday/Promotion')['Revenue_After_Discount'].mean().reset_index()
