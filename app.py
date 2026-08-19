@@ -49,27 +49,34 @@ st.sidebar.header("Filters")
 
 
 # ---------------------------------------------------------
-# DATE FILTER
+# DATE RANGE
 # ---------------------------------------------------------
 
 date_range = st.sidebar.date_input(
     "Date Range",
-    value=(df["Date"].min().date(), df["Date"].max().date()),
+    value=(
+        df["Date"].min().date(),
+        df["Date"].max().date()
+    ),
     min_value=df["Date"].min().date(),
     max_value=df["Date"].max().date()
 )
 
-# Handle single-date selection safely
+
+# Handle single-date selection
 if isinstance(date_range, tuple) and len(date_range) == 2:
+
     start_date = pd.to_datetime(date_range[0])
     end_date = pd.to_datetime(date_range[1])
+
 else:
+
     start_date = pd.to_datetime(date_range)
     end_date = start_date
 
 
 # ---------------------------------------------------------
-# CATEGORY FILTER
+# CATEGORY
 # ---------------------------------------------------------
 
 categories = st.sidebar.multiselect(
@@ -80,7 +87,7 @@ categories = st.sidebar.multiselect(
 
 
 # ---------------------------------------------------------
-# REGION FILTER
+# REGION
 # ---------------------------------------------------------
 
 regions = st.sidebar.multiselect(
@@ -91,7 +98,7 @@ regions = st.sidebar.multiselect(
 
 
 # ---------------------------------------------------------
-# STORE FILTER
+# STORE
 # ---------------------------------------------------------
 
 stores = st.sidebar.multiselect(
@@ -117,7 +124,7 @@ filtered_df = df.loc[mask].copy()
 
 
 # =========================================================
-# CHECK FILTER RESULT
+# EMPTY DATA CHECK
 # =========================================================
 
 if filtered_df.empty:
@@ -149,24 +156,32 @@ tab1, tab2, tab3 = st.tabs(
 
 with tab1:
 
-    # -----------------------------------------------------
-    # KPI CARDS
-    # -----------------------------------------------------
+    # =====================================================
+    # KPI SECTION
+    # =====================================================
 
     col1, col2, col3, col4 = st.columns(4)
 
-    total_revenue = filtered_df[
-        "Revenue_After_Discount"
-    ].sum()
 
-    total_units = filtered_df[
-        "Units Sold"
-    ].sum()
+    # Total Revenue
+    total_revenue = (
+        filtered_df["Revenue_After_Discount"].sum()
+    )
 
-    avg_revenue_transaction = filtered_df[
-        "Revenue_After_Discount"
-    ].mean()
 
+    # Total Units Sold
+    total_units = (
+        filtered_df["Units Sold"].sum()
+    )
+
+
+    # Average Revenue per Transaction
+    avg_revenue_transaction = (
+        filtered_df["Revenue_After_Discount"].mean()
+    )
+
+
+    # Stockout Risk %
     stockout_risk_pct = (
         filtered_df["Stockout_Risk"].mean() * 100
     )
@@ -177,15 +192,18 @@ with tab1:
         f"${total_revenue:,.0f}"
     )
 
+
     col2.metric(
         "Total Units Sold",
         f"{total_units:,.0f}"
     )
 
+
     col3.metric(
         "Avg Revenue / Transaction",
         f"${avg_revenue_transaction:,.2f}"
     )
+
 
     col4.metric(
         "Stockout Risk",
@@ -197,11 +215,13 @@ with tab1:
 
 
     # =====================================================
-    # MONTHLY REVENUE TREND
+    # REVENUE TREND
     # =====================================================
 
     st.subheader("📈 Revenue Trend")
 
+
+    # Monthly revenue
     monthly_revenue = (
         filtered_df
         .set_index("Date")
@@ -209,6 +229,28 @@ with tab1:
         .sum()
         .reset_index()
     )
+
+
+    # -----------------------------------------------------
+    # REMOVE INCOMPLETE FINAL MONTH
+    # -----------------------------------------------------
+
+    last_data_date = filtered_df["Date"].max()
+
+    last_month = last_data_date.to_period("M")
+
+
+    if last_data_date.day < last_data_date.days_in_month:
+
+        monthly_revenue = monthly_revenue[
+            monthly_revenue["Date"].dt.to_period("M")
+            != last_month
+        ]
+
+
+    # -----------------------------------------------------
+    # 3-MONTH MOVING AVERAGE
+    # -----------------------------------------------------
 
     monthly_revenue["3-Month Moving Average"] = (
         monthly_revenue["Revenue_After_Discount"]
@@ -219,6 +261,10 @@ with tab1:
         .mean()
     )
 
+
+    # -----------------------------------------------------
+    # REVENUE LINE CHART
+    # -----------------------------------------------------
 
     fig_trend = px.line(
         monthly_revenue,
@@ -236,6 +282,7 @@ with tab1:
     )
 
 
+    # Make actual revenue line lighter
     fig_trend.update_traces(
         selector=dict(
             name="Revenue_After_Discount"
@@ -243,6 +290,8 @@ with tab1:
         opacity=0.45
     )
 
+
+    # Make moving average line stronger
     fig_trend.update_traces(
         selector=dict(
             name="3-Month Moving Average"
@@ -270,82 +319,89 @@ with tab1:
 
 
     # =====================================================
-    # REVENUE BY CATEGORY & REGION
+    # CATEGORY & REGION ANALYSIS
     # =====================================================
 
     col5, col6 = st.columns(2)
 
 
-    # -----------------------------------------------------
-    # REVENUE BY CATEGORY
-    # -----------------------------------------------------
+    # =====================================================
+    # REVENUE CONTRIBUTION BY CATEGORY
+    # =====================================================
 
     with col5:
 
-        revenue_by_category = (
+        category_revenue = (
             filtered_df
             .groupby("Category")[
                 "Revenue_After_Discount"
             ]
             .sum()
             .reset_index()
-            .sort_values(
-                "Revenue_After_Discount",
-                ascending=False
-            )
         )
 
 
-        fig_cat = px.bar(
-            revenue_by_category,
+        # Calculate percentage contribution
+        category_revenue["Revenue Contribution %"] = (
+            category_revenue["Revenue_After_Discount"]
+            / category_revenue["Revenue_After_Discount"].sum()
+            * 100
+        )
+
+
+        category_revenue = category_revenue.sort_values(
+            "Revenue Contribution %",
+            ascending=False
+        )
+
+
+        fig_category = px.bar(
+            category_revenue,
             x="Category",
-            y="Revenue_After_Discount",
-            title="Revenue by Category",
-            text_auto=".2s"
+            y="Revenue Contribution %",
+            title="Revenue Contribution by Category",
+            text=category_revenue[
+                "Revenue Contribution %"
+            ].round(1).astype(str) + "%",
         )
 
 
-        fig_cat.update_layout(
+        fig_category.update_layout(
             xaxis_title="Category",
-            yaxis_title="Revenue",
+            yaxis_title="Revenue Contribution (%)",
             showlegend=False
         )
 
 
+        fig_category.update_traces(
+            textposition="outside"
+        )
+
+
         st.plotly_chart(
-            fig_cat,
+            fig_category,
             use_container_width=True
         )
 
 
-        top_cat = revenue_by_category.iloc[0]
-        bottom_cat = revenue_by_category.iloc[-1]
+        # Top category insight
+        top_category = category_revenue.iloc[0]
 
 
-        if bottom_cat["Revenue_After_Discount"] != 0:
-
-            gap_pct = (
-                (
-                    top_cat["Revenue_After_Discount"]
-                    - bottom_cat["Revenue_After_Discount"]
-                )
-                / bottom_cat["Revenue_After_Discount"]
-            ) * 100
-
-            st.caption(
-                f"**{top_cat['Category']}** leads with "
-                f"**{gap_pct:.1f}%** more revenue than "
-                f"**{bottom_cat['Category']}**."
-            )
+        st.caption(
+            f"**{top_category['Category']}** contributes "
+            f"**{top_category['Revenue Contribution %']:.1f}%** "
+            f"of total revenue."
+        )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # REVENUE BY REGION
-    # -----------------------------------------------------
+    # =====================================================
 
     with col6:
 
-        revenue_by_region = (
+        region_revenue = (
             filtered_df
             .groupby("Region")[
                 "Revenue_After_Discount"
@@ -360,7 +416,7 @@ with tab1:
 
 
         fig_region = px.bar(
-            revenue_by_region,
+            region_revenue,
             x="Region",
             y="Revenue_After_Discount",
             title="Revenue by Region",
@@ -381,24 +437,26 @@ with tab1:
         )
 
 
-        top_reg = revenue_by_region.iloc[0]
-        bottom_reg = revenue_by_region.iloc[-1]
+        # Region insight
+        top_region = region_revenue.iloc[0]
+        bottom_region = region_revenue.iloc[-1]
 
 
-        if bottom_reg["Revenue_After_Discount"] != 0:
+        if bottom_region["Revenue_After_Discount"] != 0:
 
-            gap_pct_reg = (
+            region_gap = (
                 (
-                    top_reg["Revenue_After_Discount"]
-                    - bottom_reg["Revenue_After_Discount"]
+                    top_region["Revenue_After_Discount"]
+                    - bottom_region["Revenue_After_Discount"]
                 )
-                / bottom_reg["Revenue_After_Discount"]
+                / bottom_region["Revenue_After_Discount"]
             ) * 100
 
+
             st.caption(
-                f"**{top_reg['Region']}** leads with "
-                f"**{gap_pct_reg:.1f}%** more revenue than "
-                f"**{bottom_reg['Region']}**."
+                f"**{top_region['Region']}** leads with "
+                f"**{region_gap:.1f}%** more revenue than "
+                f"**{bottom_region['Region']}**."
             )
 
 
@@ -421,14 +479,16 @@ with tab1:
 
     promo_impact["Holiday/Promotion"] = (
         promo_impact["Holiday/Promotion"]
-        .map({
-            0: "No Promotion",
-            1: "Promotion"
-        })
+        .map(
+            {
+                0: "No Promotion",
+                1: "Promotion"
+            }
+        )
     )
 
 
-    # Check that both promotion groups exist
+    # Check if both groups exist
     if len(promo_impact) >= 2:
 
         no_promo_val = promo_impact.loc[
@@ -453,6 +513,7 @@ with tab1:
             ) * 100
 
         else:
+
             pct_diff = 0
 
 
@@ -480,9 +541,10 @@ with tab1:
 
         st.caption(
             f"Promotions show a "
-            f"**{pct_diff:+.1f}%** difference in average "
-            f"revenue per transaction."
+            f"**{pct_diff:+.1f}%** difference in "
+            f"average revenue per transaction."
         )
+
 
     else:
 
@@ -498,40 +560,48 @@ with tab1:
 
 with tab2:
 
-    # -----------------------------------------------------
+    # =====================================================
     # INVENTORY KPIs
-    # -----------------------------------------------------
+    # =====================================================
 
     col1, col2, col3, col4 = st.columns(4)
 
 
-    stockout_count = filtered_df[
-        "Stockout_Risk"
-    ].sum()
+    # Stockout count
+    stockout_count = (
+        filtered_df["Stockout_Risk"].sum()
+    )
 
 
+    # Stockout percentage
     stockout_pct = (
         filtered_df["Stockout_Risk"].mean()
         * 100
     )
 
 
+    # Days of stock
     finite_stock = filtered_df.loc[
         filtered_df["Days_of_Stock"] != float("inf"),
         "Days_of_Stock"
     ]
 
 
-    avg_days_stock = (
-        finite_stock.mean()
-        if not finite_stock.empty
-        else 0
+    if not finite_stock.empty:
+
+        avg_days_stock = (
+            finite_stock.mean()
+        )
+
+    else:
+
+        avg_days_stock = 0
+
+
+    # Total inventory
+    total_inventory = (
+        filtered_df["Inventory Level"].sum()
     )
-
-
-    total_inventory = filtered_df[
-        "Inventory Level"
-    ].sum()
 
 
     col1.metric(
@@ -562,7 +632,7 @@ with tab2:
 
 
     # =====================================================
-    # TOP 10 PRODUCTS AT STOCKOUT RISK
+    # TOP 10 STOCKOUT RISK PRODUCTS
     # =====================================================
 
     st.subheader(
@@ -614,9 +684,9 @@ with tab2:
     col7, col8 = st.columns(2)
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # STOCKOUT RISK BY CATEGORY
-    # -----------------------------------------------------
+    # =====================================================
 
     with col7:
 
@@ -656,9 +726,9 @@ with tab2:
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # STOCKOUT RISK BY REGION
-    # -----------------------------------------------------
+    # =====================================================
 
     with col8:
 
@@ -745,6 +815,10 @@ with tab2:
 
 with tab3:
 
+    # =====================================================
+    # INTRODUCTION
+    # =====================================================
+
     st.subheader(
         "🔄 What-If Reorder Point Simulator"
     )
@@ -756,9 +830,9 @@ with tab3:
     )
 
 
-    # -----------------------------------------------------
-    # SIMULATOR INPUTS
-    # -----------------------------------------------------
+    # =====================================================
+    # INPUTS
+    # =====================================================
 
     col_a, col_b = st.columns([1, 2])
 
@@ -797,9 +871,9 @@ with tab3:
         )
 
 
-    # -----------------------------------------------------
-    # PRODUCT + STORE DATA
-    # -----------------------------------------------------
+    # =====================================================
+    # FILTER PRODUCT + STORE
+    # =====================================================
 
     product_df = (
         df[
@@ -810,18 +884,18 @@ with tab3:
     )
 
 
-    # -----------------------------------------------------
-    # REORDER CALCULATION
-    # -----------------------------------------------------
+    # =====================================================
+    # REORDER POINT CALCULATION
+    # =====================================================
 
-    avg_daily_sales = product_df[
-        "Units Sold"
-    ].mean()
+    avg_daily_sales = (
+        product_df["Units Sold"].mean()
+    )
 
 
-    max_inventory_seen = product_df[
-        "Inventory Level"
-    ].max()
+    max_inventory_seen = (
+        product_df["Inventory Level"].max()
+    )
 
 
     base_reorder_point = (
@@ -842,9 +916,9 @@ with tab3:
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # SIMULATOR METRICS
-    # -----------------------------------------------------
+    # =====================================================
 
     with col_a:
 
@@ -860,6 +934,7 @@ with tab3:
         )
 
 
+        # Warning
         if suggested_reorder_point > max_inventory_seen:
 
             st.warning(
@@ -871,9 +946,9 @@ with tab3:
             )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # INVENTORY TREND
-    # -----------------------------------------------------
+    # =====================================================
 
     with col_b:
 
@@ -888,6 +963,7 @@ with tab3:
         )
 
 
+        # Reorder point line
         fig_product.add_hline(
             y=suggested_reorder_point,
             line_dash="dash",
@@ -909,9 +985,9 @@ with tab3:
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # FORMULA
-    # -----------------------------------------------------
+    # =====================================================
 
     st.caption(
         f"**Formula:** Reorder Point = "
